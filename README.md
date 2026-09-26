@@ -110,7 +110,7 @@ nexttrack/
 │   ├── test_analyze_feedback.py   # study-analysis statistics
 │   └── test_web_endpoints.py      # /catalogue and the web demo route
 ├── study_data/                    # ratings (git-ignored: participant data)
-├── Draftwork/                     # report drafts, study plan, notes
+├── results/                       # archived test + evaluation output
 ├── sample_request.json            # example POST /recommend body
 ├── .env.example                   # optional API keys for enrichment
 ├── requirements.txt
@@ -259,9 +259,13 @@ stays stateless).
 python scripts/analyze_feedback.py     # mean rating per method + A/B effect
 ```
 
-The full protocol (hypotheses, participants, procedure, questionnaire, analysis,
-and the planned iterate-and-re-test step) is in
-`Draftwork/USER_STUDY_PLAN.md`.
+The study is **within-subjects and blind**: method assignment is block
+randomised so each participant receives an equal number of session-aware and
+baseline recommendations, the app sends no explicit preferences, and diversity
+is held constant across conditions, so the only difference between them is the
+history-based adaptation being tested. `scripts/analyze_feedback.py` reports
+per-participant means alongside design checks (assignment balance and rating
+pacing), so the validity of a collected run can be read straight off the data.
 
 ## Dataset enrichment (real tracks from external sources)
 
@@ -402,10 +406,9 @@ are described above. What remains:
   match, which is transparent but coarse.
 - **Learn the feature weights from collected study data** rather than setting
   them by hand, then re-test them.
-- **Complete the user study.** The apparatus, protocol and analysis are built
-  and validated (`Draftwork/USER_STUDY_PLAN.md`,
-  `Draftwork/FACILITATOR_SHEET.md`, `scripts/analyze_feedback.py`); the study
-  with participants has not yet been run, so no participant results are
-  reported.
+- **Complete the user study.** The apparatus and analysis are built and
+  validated (study mode in the web app, `POST /feedback`,
+  `scripts/analyze_feedback.py`); the study with participants has not yet been
+  run, so no participant results are reported.
 - **Extend playable coverage** beyond 190 tracks as YouTube quota allows.
 - **Optional SQLite storage** for larger catalogues.
