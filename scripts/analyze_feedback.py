@@ -160,13 +160,21 @@ def _design_checks(records: list[dict]) -> None:
         gaps = [g for g in gaps if g >= 0]
         ordered = sorted(gaps)
         median = ordered[len(ordered) // 2]
-        too_fast = sum(1 for g in gaps if g < 20)
+        # A familiar track can be judged for session fit in a few seconds, so
+        # short gaps are not disqualifying on their own. Below ~3s, though, the
+        # embedded player has barely begun producing audio, so the rating
+        # cannot reflect having heard the track at all.
+        implausible = sum(1 for g in gaps if g < 3)
+        brisk = sum(1 for g in gaps if 3 <= g < 10)
+        considered = sum(1 for g in gaps if g >= 10)
         print(f"Median gap between ratings: {median:.1f}s")
-        print(f"Gaps under 20s            : {too_fast}/{len(gaps)}", end="")
-        if too_fast > len(gaps) / 2:
-            print("   <-- too fast to have listened; pacing does not match the protocol")
-        else:
-            print("   (consistent with a 20-30s listen)")
+        print(f"  under 3s (not heard)    : {implausible}/{len(gaps)}", end="")
+        print("   <-- NOT CREDIBLE" if implausible > len(gaps) / 4 else "")
+        print(f"  3-10s (familiar track)  : {brisk}/{len(gaps)}")
+        print(f"  10s+                    : {considered}/{len(gaps)}")
+        if implausible > len(gaps) / 4:
+            print("  Report the latency distribution rather than a listening time,")
+            print("  and note that ratings this fast cannot reflect hearing the track.")
 
 
 def _significance(aware: list[int], base: list[int]) -> None:

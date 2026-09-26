@@ -1,5 +1,5 @@
 NextTrack — evaluation suite (full catalogue, 395 tracks)
-Generated: 2026-09-26 13:23 UTC
+Generated: 2026-09-26 14:22 UTC
 
 NextTrack evaluation — 395 tracks in dataset (full)
 
@@ -55,8 +55,8 @@ One seeded session per genre, 6 next-tracks each, no explicit preferences.
 Metric                Session-aware   Baseline        Δ
 ------------------------------------------------------
 Genre coherence              100.0%       8.3%   +91.7
-Mood coherence                90.0%      36.7%   +53.3
-Artist affinity               53.3%       0.0%   +53.3
+Mood coherence                91.7%      36.7%   +55.0
+Artist affinity               41.7%       0.0%   +41.7
 
 Interpretation: with no explicit preferences, the session-aware
 recommender keeps the session far more coherent — it stays within the

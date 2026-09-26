@@ -57,6 +57,9 @@ class SessionContext:
     target_tempo: int | None
     preferred_artist: str | None
     history_artists: set = field(default_factory=set)
+    # How many times each artist (lower-cased) appears in the recent history,
+    # so repeated artists can have their affinity bonus damped.
+    artist_play_counts: dict = field(default_factory=dict)
     genre_inferred: bool = False
     mood_inferred: bool = False
     tempo_inferred: bool = False
@@ -81,6 +84,9 @@ def _session_context(history_tracks: list[dict], preferences: Preferences) -> Se
 
     recent = history_tracks[-RECENT_HISTORY:]
     ctx.history_artists = {t["artist"] for t in recent if t.get("artist")}
+    ctx.artist_play_counts = Counter(
+        t["artist"].lower() for t in recent if t.get("artist")
+    )
 
     if ctx.genre is None:
         genres = [t["genre"] for t in recent if t.get("genre")]
@@ -264,7 +270,8 @@ def recommend(history, preferences=None, candidates=None,
             "genre": score_genre(track["genre"], context.genre),
             "artist": score_artist_affinity(
                 track["artist"], context.preferred_artist,
-                context.history_artists, similar_artists
+                context.history_artists, similar_artists,
+                context.artist_play_counts,
             ),
             "tempo": score_tempo(track["tempo"], context.target_tempo),
             "mood": score_mood(track["mood"], context.mood),

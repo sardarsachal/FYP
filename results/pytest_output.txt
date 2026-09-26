@@ -1,12 +1,12 @@
 NextTrack — automated test suite
-Generated: 2026-09-26 13:23 UTC
+Generated: 2026-09-26 14:22 UTC
 
-........................................................................ [ 78%]
-....................                                                     [100%]
+........................................................................ [ 73%]
+..........................                                               [100%]
 =============================== warnings summary ===============================
 .venv/lib/python3.13/site-packages/starlette/testclient.py:40
   /Users/sardarmuhammadsachal/FYP FINAL SUB/nexttrack/.venv/lib/python3.13/site-packages/starlette/testclient.py:40: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
     _PortalFactoryType = typing.Callable[[], typing.ContextManager[anyio.abc.BlockingPortal]]
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-92 passed, 1 warning in 3.03s
+98 passed, 1 warning in 3.08s

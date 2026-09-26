@@ -102,7 +102,7 @@ nexttrack/
 │   ├── analyze_feedback.py        # user-study analysis
 │   ├── enrich_dataset.py          # offline metadata enrichment pipeline
 │   └── seed_tracks.py             # the fixed seed list (92 artist/title pairs)
-├── tests/                         # 92 tests
+├── tests/                         # 98 tests
 │   ├── test_scoring.py            # scoring functions
 │   ├── test_recommender.py        # recommender logic
 │   ├── test_api.py                # API via FastAPI TestClient
@@ -190,7 +190,7 @@ curl -X POST http://localhost:8000/recommend \
 ## Run the automated tests
 
 ```bash
-pytest -q          # all 92 tests
+pytest -q          # all 98 tests
 pytest -v          # verbose, per-test names
 ```
 
@@ -219,8 +219,39 @@ The suite has three parts, each producing report-ready output:
 3. **Session-aware vs baseline (A/B)** — plays seeded sessions with no explicit
    preferences and measures *session coherence* (a metric independent of the
    recommender's own objective). Session-aware holds genre coherence at
-   **100% vs 8.3%**, mood at **90% vs 36.7%** and artist affinity at
-   **53.3% vs 0%**, confirming the history-based upgrade works.
+   **100% vs 8.3%**, mood at **91.7% vs 36.7%** and artist affinity at
+   **41.7% vs 0%**, confirming the history-based upgrade works.
+
+### Artist repeat cap — a change driven by the user study
+
+Artist affinity was deliberately reduced from 53.3% to 41.7%. The first user
+study (2 participants, 20 ratings) rated session-aware recommendations *below*
+the baseline — 2.90 vs 4.10. The cause was visible in the data: session-aware
+returned one artist four times in ten tracks and those four were rated
+1, 1, 2, 1, while the baseline spread ten tracks over eight artists.
+
+The offline coherence metric had scored that same repetition as a **success**,
+which is the gap between an accuracy proxy and perceived quality that McNee,
+Riedl and Konstan (2006) describe. So the metric was not wrong to measure
+artist affinity — it was wrong to treat more of it as always better.
+
+`ARTIST_AFFINITY_REPEAT_LIMIT` (`app/config.py`) now withholds the affinity
+bonus once an artist has been heard twice in the recent history. An explicitly
+requested artist is exempt: the user asked for it. Measured over 12 simulated
+ten-track sessions:
+
+| | Distinct artists / 10 | Most-repeated artist | Worst case |
+|---|---|---|---|
+| Before | 6.9 | 3.1 | 6 |
+| After | **7.8** | **2.3** | **4** |
+
+The cap removes the amplifier rather than banning the artist — a track can
+still win on genre, tempo and popularity alone — so repeats become less likely
+rather than impossible. Genre coherence (100%) and the random-baseline and
+sensitivity results are unchanged; mood coherence rose slightly (90% → 91.7%).
+
+**This change has not yet been re-tested with participants.** Whether it
+actually raises perceived quality is the open question the re-test answers.
 
 ### Why the margin over random is modest — and why that is the honest number
 

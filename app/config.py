@@ -31,3 +31,26 @@ TEMPO_RANGE_BPM: int = 60
 # played artist. Below the exact-match score of 1.0, so exact affinity still
 # wins, but well above 0 so related artists are meaningfully preferred.
 SIMILAR_ARTIST_SCORE: float = 0.6
+
+# Repeat limit on the *session* artist affinity (not on an explicitly requested
+# artist, which the user has asked for and should keep receiving).
+#
+# The first user study surfaced this. With an unlimited affinity bonus the
+# recommender returned one artist four times in ten tracks, and participants
+# rated those four 1, 1, 2, 1 — dragging the session-aware condition below the
+# baseline (2.90 vs 4.10). The offline coherence metric had scored the same
+# behaviour as a *success* (artist affinity 53.3% vs 0%), which is exactly the
+# gap between an accuracy proxy and perceived quality that McNee, Riedl and
+# Konstan (2006) describe.
+#
+# Once an artist has appeared this many times in the recent history it stops
+# receiving the affinity bonus, so the recommender still follows a taste but
+# stops amplifying one artist. Note this removes the amplifier rather than
+# banning the artist: a track can still win on genre, tempo and popularity
+# alone, so repeats become less likely rather than impossible.
+#
+# Chosen by simulating 12 ten-track sessions per setting: no limit gave 6.9
+# distinct artists per 10 tracks (worst case 6 repeats); a limit of 2 gives 7.8
+# (worst case 4). A limit of 1 raised the mean slightly (8.3) but not the worst
+# case, and discards the taste signal after a single play.
+ARTIST_AFFINITY_REPEAT_LIMIT: int = 2

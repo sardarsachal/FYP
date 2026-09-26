@@ -11,10 +11,16 @@ import math
 
 import pytest
 
-from app.config import DEFAULT_WEIGHTS, TEMPO_RANGE_BPM
+from app.config import (
+    ARTIST_AFFINITY_REPEAT_LIMIT,
+    DEFAULT_WEIGHTS,
+    SIMILAR_ARTIST_SCORE,
+    TEMPO_RANGE_BPM,
+)
 from app.core.scoring import (
     normalize_weights,
     score_artist,
+    score_artist_affinity,
     score_genre,
     score_mood,
     score_popularity,
@@ -135,3 +141,52 @@ def test_all_zero_weights_raises():
     with pytest.raises(ValueError):
         normalize_weights({"genre": 0, "tempo": 0, "artist": 0,
                            "mood": 0, "popularity": 0})
+
+
+# --- artist repeat cap (added after the first user study) -------------------
+#
+# The study found session-aware recommendations returning one artist four times
+# in ten tracks, rated 1, 1, 2, 1. The affinity bonus is now withheld once an
+# artist has been heard ARTIST_AFFINITY_REPEAT_LIMIT times.
+
+def test_history_artist_keeps_affinity_below_the_repeat_limit():
+    for plays in range(ARTIST_AFFINITY_REPEAT_LIMIT):
+        assert score_artist_affinity(
+            "Nirvana", None, {"Nirvana"}, None, {"nirvana": plays}
+        ) == 1.0
+
+
+def test_history_artist_loses_affinity_at_the_repeat_limit():
+    assert score_artist_affinity(
+        "Nirvana", None, {"Nirvana"}, None,
+        {"nirvana": ARTIST_AFFINITY_REPEAT_LIMIT},
+    ) == 0.0
+
+
+def test_repeat_cap_does_not_apply_to_an_explicitly_requested_artist():
+    """The user asked for this artist, so repetition is what they wanted."""
+    assert score_artist_affinity(
+        "Nirvana", "Nirvana", {"Nirvana"}, None, {"nirvana": 99}
+    ) == 1.0
+
+
+def test_capped_artist_cannot_reclaim_the_bonus_via_similarity():
+    """An over-played artist listed as similar to another seed stays at 0."""
+    similar = {"arctic monkeys": {"nirvana"}}
+    assert score_artist_affinity(
+        "Nirvana", None, {"Nirvana", "Arctic Monkeys"}, similar,
+        {"nirvana": ARTIST_AFFINITY_REPEAT_LIMIT},
+    ) == 0.0
+
+
+def test_a_related_artist_not_yet_played_still_scores():
+    """The cap must not disable the similar-artist signal generally."""
+    similar = {"arctic monkeys": {"nirvana"}}
+    assert score_artist_affinity(
+        "Nirvana", None, {"Arctic Monkeys"}, similar, {}
+    ) == SIMILAR_ARTIST_SCORE
+
+
+def test_omitting_play_counts_preserves_the_previous_behaviour():
+    """Callers that pass no counts (e.g. older tests) are unaffected."""
+    assert score_artist_affinity("Nirvana", None, {"Nirvana"}) == 1.0

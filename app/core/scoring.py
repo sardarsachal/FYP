@@ -11,6 +11,7 @@ weights into a single overall score per track.
 """
 
 from app.config import (
+    ARTIST_AFFINITY_REPEAT_LIMIT,
     DEFAULT_WEIGHTS,
     SCORING_FEATURES,
     SIMILAR_ARTIST_SCORE,
@@ -98,12 +99,17 @@ def score_artist_affinity(
     preferred_artist: str | None,
     history_artists: set[str] | None = None,
     similar_map: dict[str, set[str]] | None = None,
+    artist_play_counts: dict[str, int] | None = None,
 ) -> float:
     """
     Artist score capturing explicit, implicit (session), and *similar* affinity.
 
-    - 1.0 if the candidate's artist matches the explicitly preferred artist OR
+    - 1.0 if the candidate's artist matches the explicitly preferred artist, or
       an artist heard in the recent listening history (exact affinity).
+    - 0.0 for a history artist already heard ARTIST_AFFINITY_REPEAT_LIMIT
+      times: the taste signal is kept, but one artist stops being amplified
+      into a monotonous session. An *explicitly requested* artist is exempt —
+      the user asked for it.
     - SIMILAR_ARTIST_SCORE if the candidate's artist is *similar* (per the
       Last.fm similarity map) to a preferred or recently played artist — this is
       the "recommend related artists" signal.
@@ -122,7 +128,20 @@ def score_artist_affinity(
         seed_artists.update(a.lower() for a in history_artists)
 
     if ca in seed_artists:
-        return 1.0
+        # An explicitly requested artist keeps full affinity however often it
+        # plays: the user asked for it. Session affinity, which the user never
+        # asked for, is capped so one artist cannot dominate the session.
+        if preferred_artist and ca == preferred_artist.lower():
+            return 1.0
+        plays = (artist_play_counts or {}).get(ca, 0)
+        if plays < ARTIST_AFFINITY_REPEAT_LIMIT:
+            return 1.0
+        # Already heard enough this session: withhold the bonus entirely.
+        # Deliberately not falling through to the similar-artist check — this
+        # artist could be listed as similar to another seed, which would hand
+        # back much of the bonus the cap just removed. Related artists that
+        # have *not* been over-played still score via that check below.
+        return 0.0
 
     # Similar-artist affinity: is the candidate related to any seed artist?
     if similar_map and seed_artists:
