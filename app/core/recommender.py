@@ -8,7 +8,7 @@ candidate tracks, and returns the best next track with a reason.
 
 It is completely stateless — every call depends only on its arguments — and
 contains no HTTP code, so it can be unit-tested directly. The /recommend
-endpoint (Milestone 6) will simply call recommend() and serialize the result.
+endpoint simply calls recommend() and serializes the result.
 """
 
 import hashlib
@@ -101,9 +101,9 @@ def _session_context(history_tracks: list[dict], preferences: Preferences) -> Se
 class RecommendationResult:
     """Plain result object returned by recommend().
 
-    Milestone 6 maps this onto the RecommendResponse Pydantic model for the
-    HTTP layer; keeping it as a dataclass here keeps the core decoupled from
-    the API and trivial to assert on in tests.
+    The HTTP layer maps this onto the RecommendResponse Pydantic model;
+    keeping it as a dataclass here keeps the core decoupled from the API and
+    trivial to assert on in tests.
     """
 
     recommended_track: dict

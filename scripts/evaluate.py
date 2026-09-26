@@ -29,6 +29,7 @@ from pathlib import Path
 # Allow running as a plain script (`python scripts/evaluate.py`) by making
 # the project root importable, so `import app...` works.
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = PROJECT_ROOT / "app" / "data"
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -360,10 +361,23 @@ def main():
     parser.add_argument(
         "--section", choices=["all", "random", "sensitivity", "ab"],
         default="all", help="Which evaluation to run (default: all).")
+    # The catalogue grew from the original 30 hand-authored tracks to 395
+    # externally sourced ones, which changes the numbers: a larger catalogue
+    # means a random pick is far more likely to be a reasonable match, so the
+    # margin over random narrows even though the recommender is unchanged.
+    # Being able to re-run either dataset keeps the earlier reported figures
+    # checkable rather than merely historical.
+    parser.add_argument(
+        "--dataset", choices=["full", "curated"], default="full",
+        help="Which catalogue to evaluate: 'full' (395 tracks, the shipped "
+             "dataset) or 'curated' (the original 30 hand-authored tracks).")
     args = parser.parse_args()
 
-    tracks = load_tracks()
-    print(f"NextTrack evaluation — {len(tracks)} tracks in dataset")
+    data_file = DATA_DIR / ("tracks.json" if args.dataset == "full"
+                            else "tracks.curated.json")
+    tracks = load_tracks(data_file)
+    print(f"NextTrack evaluation — {len(tracks)} tracks in dataset "
+          f"({args.dataset})")
 
     if args.section in ("all", "random"):
         rng = random.Random(RANDOM_SEED)

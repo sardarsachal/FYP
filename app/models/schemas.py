@@ -1,13 +1,10 @@
 """
-Pydantic models for NextTrack (Milestone 3).
+Pydantic models for NextTrack.
 
-These define the shape of the data flowing in and out of the future
-/recommend endpoint. Pydantic validates incoming JSON automatically, so
-malformed requests are rejected with a clear 422 error before any
-recommendation logic runs.
-
-No endpoint uses these yet — they are defined here so the recommender and
-the API layer (built in later milestones) can rely on validated data.
+These define the shape of the data flowing in and out of the API.
+Pydantic validates incoming JSON automatically, so malformed requests are
+rejected with a clear 422 error before any recommendation logic runs, and
+the recommender can rely on already-validated data.
 """
 
 from typing import Optional
@@ -113,7 +110,7 @@ class Preferences(BaseModel):
 
 
 class RecommendRequest(BaseModel):
-    """The request body for the future POST /recommend endpoint."""
+    """The request body for POST /recommend."""
 
     # List of previously played track IDs. May be empty (no history yet).
     history: list[str] = Field(default_factory=list)
@@ -127,7 +124,7 @@ class RecommendRequest(BaseModel):
 
 
 class RecommendResponse(BaseModel):
-    """The response body returned by the future POST /recommend endpoint."""
+    """The response body returned by POST /recommend."""
 
     recommended_track: Track
     score: float

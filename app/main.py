@@ -2,9 +2,8 @@
 NextTrack — Music Recommendation API
 Application entry point.
 
-This file creates the FastAPI application and wires in the API routes.
-For the MVP it only exposes a health-check endpoint (Milestone 1).
-The recommendation endpoint (/recommend) will be added in a later milestone.
+This file creates the FastAPI application and wires in the API routes:
+/health, /recommend, /catalogue, /feedback and the single-page web demo.
 """
 
 from fastapi import FastAPI

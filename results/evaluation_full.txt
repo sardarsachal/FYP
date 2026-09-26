@@ -1,0 +1,66 @@
+NextTrack — evaluation suite (full catalogue, 395 tracks)
+Generated: 2026-09-26 13:23 UTC
+
+NextTrack evaluation — 395 tracks in dataset (full)
+
+Scenario           Recommended track          Rec   Random  Improvement
+-----------------------------------------------------------------------
+Energetic rock     Wildfire                 0.962    0.738       +30.4%
+Calm ambient       Aurora                   0.956    0.700       +36.6%
+Happy pop          Sunset Boulevard         0.984    0.758       +29.9%
+Energetic hiphop   Street Symphony          0.969    0.750       +29.3%
+Calm jazz          Slow Burn                0.939    0.694       +35.3%
+
+Summary
+=======
+Scenarios evaluated      : 5
+Random trials / scenario : 1000 (seed 42)
+Average recommender score: 0.962
+Average random score     : 0.728
+Average improvement      : +32.3% over random
+History exclusion        : PASSED — no history track was ever recommended.
+
+Conclusion: across every scenario the recommender selects a track that
+scores higher than the average random choice, and it never repeats a
+track from the listening history. This demonstrates a clear, explainable
+improvement over random selection.
+
+Weight sensitivity analysis
+===========================
+Scaling each feature weight by [0.5, 0.75, 1.25, 1.5] (one at a time), session_aware off.
+
+Perturbation trials       : 100
+Top recommendation stable : 94.0% (94/100 left the top pick unchanged)
+
+Influence by feature (how often perturbing it changed the pick):
+  popularity   4/20 flips   20.0%  ####
+  tempo        2/20 flips   10.0%  ##
+  genre        0/20 flips    0.0%  
+  artist       0/20 flips    0.0%  
+  mood         0/20 flips    0.0%  
+
+Interpretation: the top recommendation is stable under 94% of single-weight
+perturbations, so the result does not hinge on the exact weights. Scaling
+genre, artist, mood never changed the pick: the strongly weighted preference match
+(genre above all) is decisive enough that its weight can vary by ±50% without
+changing the outcome. The pick only shifts on popularity, tempo — the finer signals that
+discriminate among otherwise similar top candidates. Both facts support the
+chosen weights: the dominant feature is robustly dominant, and sensitivity is
+confined to the low-weight tie-breakers.
+
+Session-aware vs baseline (A/B on session coherence)
+====================================================
+One seeded session per genre, 6 next-tracks each, no explicit preferences.
+
+Metric                Session-aware   Baseline        Δ
+------------------------------------------------------
+Genre coherence              100.0%       8.3%   +91.7
+Mood coherence                90.0%      36.7%   +53.3
+Artist affinity               53.3%       0.0%   +53.3
+
+Interpretation: with no explicit preferences, the session-aware
+recommender keeps the session far more coherent — it stays within the
+seed's genre/mood and returns to artists already heard — whereas the
+baseline drifts toward globally popular tracks regardless of context.
+This quantifies the benefit of the history-based upgrade on a metric
+independent of the recommender's own scoring objective.

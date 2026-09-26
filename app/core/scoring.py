@@ -6,8 +6,8 @@ preferences and returns a value in [0, 1], where 1 means "perfect match".
 The functions are intentionally pure (no I/O, no global state) so they are
 trivial to unit-test and easy to reason about in the report.
 
-The full recommender (a later milestone) will combine these per-feature
-scores using normalized weights into a single overall score per track.
+The full recommender combines these per-feature scores using normalized
+weights into a single overall score per track.
 """
 
 from app.config import (

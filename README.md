@@ -6,13 +6,15 @@ listener's recent history, their preferences, and a pool of available tracks —
 comes from the request itself, and every recommendation is returned with a
 plain-English explanation of *why* it was chosen.
 
-> **Status:** Working API (`/health`, `/recommend`, `/catalogue`), an
-> interactive **web app** with an embedded music player, a 122-track dataset
+> **Status:** Working API (`/health`, `/recommend`, `/catalogue`, `/feedback`),
+> an interactive **web app** with an embedded music player, a 395-track dataset
 > enriched from external sources (MusicBrainz / AcousticBrainz / Last.fm /
-> YouTube), 42 passing automated tests, and a reproducible evaluation script
-> comparing the recommender against random selection.
+> YouTube) of which 190 are playable, 92 passing automated tests, and a
+> reproducible three-part evaluation suite.
 >
 > **Web demo:** run the server (below) and open <http://localhost:8000>.
+> Use `localhost`, **not** `127.0.0.1` — YouTube refuses to play embedded
+> video on a page served from a bare IP address.
 
 ---
 
@@ -31,20 +33,34 @@ stored user profiles, and no data retained between requests.
 **Implemented (must-have):**
 - `GET /health` — liveness check.
 - `POST /recommend` — recommend the next track with explanation.
+- `GET /catalogue` — the dataset plus genre/mood vocabularies (`playable_only` filter).
+- `POST /feedback` — record one anonymous user-study rating.
 - Content-based, preference-weighted scoring (genre, artist, tempo, mood, popularity).
 - Listening-history exclusion (never recommends an already-heard track).
 - Deterministic, reproducible tie-breaking.
 - Request validation and clean error responses.
-- Bundled local dataset (30 sample tracks) with optional inline candidates.
+- Bundled local dataset (395 tracks) with optional inline candidates.
 - Automated unit + API tests.
 - Recommender-vs-random evaluation script.
 
-**Future (could-have):** external metadata enrichment (Spotify/MusicBrainz),
-SQLite storage, history-based taste inference, a web demo, diversity controls.
+**Implemented (beyond the MVP):**
+- **External metadata enrichment** — the catalogue is built offline from
+  MusicBrainz, AcousticBrainz, Last.fm, YouTube and the Cover Art Archive.
+- **Session-aware taste inference** — genre/mood/tempo inferred from the
+  request's history when the user sets no explicit preference.
+- **Similar-artist affinity** — a Last.fm-derived artist graph, so the
+  recommender can follow a taste rather than only an exact artist match.
+- **Explicit genre/mood hard filters** — a stated preference constrains the
+  candidate pool rather than merely adding weight.
+- **Diversity control** — score-aware sampling to avoid over-specialisation.
+- **Web app** with an embedded player and a blind A/B **study mode**.
+
+**Future (could-have):** SQLite storage for larger catalogues, fuzzy/semantic
+genre matching, and learning the feature weights from collected study data.
 
 ## Technical stack
 
-- **Python 3.9+**
+- **Python 3.10+** (the code uses PEP 604 `X | None` annotations)
 - **FastAPI** — web framework (automatic validation + interactive docs)
 - **Uvicorn** — ASGI server
 - **Pydantic** — request/response validation
@@ -61,32 +77,49 @@ without touching the recommendation logic.
 ```text
 nexttrack/
 ├── app/
-│   ├── main.py              # FastAPI app + route wiring
-│   ├── config.py            # scoring weights + tempo range constants
+│   ├── main.py                    # FastAPI app + route wiring
+│   ├── config.py                  # scoring weights + tempo range constants
+│   ├── feedback.py                # appends user-study ratings (the only writer)
 │   ├── api/
-│   │   └── routes.py        # /health and /recommend endpoints
+│   │   └── routes.py              # all five endpoints
 │   ├── core/
-│   │   ├── scoring.py       # pure per-feature scoring functions
-│   │   ├── recommender.py   # combine scores, exclude history, rank, tie-break
-│   │   └── explain.py       # builds the human-readable explanation
+│   │   ├── scoring.py             # pure per-feature scoring functions
+│   │   ├── recommender.py         # combine scores, filter, rank, tie-break
+│   │   ├── similarity.py          # similar-artist lookup
+│   │   └── explain.py             # builds the human-readable explanation
 │   ├── data/
-│   │   ├── loader.py        # loads + validates the dataset
-│   │   └── tracks.json      # 30 sample tracks
-│   └── models/
-│       └── schemas.py       # Pydantic request/response models
+│   │   ├── loader.py              # loads + validates the dataset
+│   │   ├── tracks.json            # 395 tracks (the shipped catalogue)
+│   │   ├── tracks.curated.json    # the original 30 hand-authored tracks
+│   │   ├── tracks.enriched.json   # 365 externally sourced tracks
+│   │   └── artist_similarity.json # Last.fm-derived artist graph
+│   ├── models/
+│   │   └── schemas.py             # Pydantic request/response models
+│   └── web/
+│       └── index.html             # single-page web demo + study mode
 ├── scripts/
-│   └── evaluate.py          # recommender vs random comparison
-├── tests/
-│   ├── test_scoring.py      # unit tests for scoring functions
-│   ├── test_recommender.py  # unit tests for the recommender
-│   └── test_api.py          # API tests via FastAPI TestClient
-├── sample_request.json      # example POST /recommend body
+│   ├── evaluate.py                # three-part evaluation suite
+│   ├── analyze_feedback.py        # user-study analysis
+│   ├── enrich_dataset.py          # offline metadata enrichment pipeline
+│   └── seed_tracks.py             # the fixed seed list (92 artist/title pairs)
+├── tests/                         # 92 tests
+│   ├── test_scoring.py            # scoring functions
+│   ├── test_recommender.py        # recommender logic
+│   ├── test_api.py                # API via FastAPI TestClient
+│   ├── test_feedback.py           # POST /feedback + the rating writer
+│   ├── test_analyze_feedback.py   # study-analysis statistics
+│   └── test_web_endpoints.py      # /catalogue and the web demo route
+├── study_data/                    # ratings (git-ignored: participant data)
+├── Draftwork/                     # report drafts, study plan, notes
+├── sample_request.json            # example POST /recommend body
+├── .env.example                   # optional API keys for enrichment
 ├── requirements.txt
-├── README.md
-└── REPORT_NOTES.md          # notes + checklist for the project report
+└── README.md
 ```
 
 ## Setup (macOS)
+
+Requires **Python 3.10 or newer**.
 
 ```bash
 cd nexttrack
@@ -98,7 +131,13 @@ source .venv/bin/activate
 # 2. Install dependencies
 pip install --upgrade pip
 pip install -r requirements.txt
+
+# 3. (Optional, for the enrichment pipeline only) add API keys
+cp .env.example .env     # then fill in the keys you have; all are optional
 ```
+
+Nothing in the API or the tests needs a key — the keys are used only by the
+offline enrichment script.
 
 ## Run the API
 
@@ -106,8 +145,14 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 ```
 
+- Web demo: http://localhost:8000
 - Interactive API docs: http://localhost:8000/docs
 - Health check: http://localhost:8000/health
+
+> **Open the demo at `localhost`, not `127.0.0.1`.** YouTube refuses to play
+> embedded video on a page served from a bare IP address, so
+> `http://127.0.0.1:8000` shows "Video unavailable" on every track while
+> `http://localhost:8000` plays normally.
 
 ## Test `/health`
 
@@ -145,33 +190,60 @@ curl -X POST http://localhost:8000/recommend \
 ## Run the automated tests
 
 ```bash
-pytest -q          # all 42 tests
+pytest -q          # all 92 tests
 pytest -v          # verbose, per-test names
 ```
 
 ## Run the evaluation script
 
 ```bash
-python scripts/evaluate.py                 # all three sections
-python scripts/evaluate.py --section random        # vs random baseline
+python scripts/evaluate.py                          # all three sections
+python scripts/evaluate.py --section random         # vs random baseline
 python scripts/evaluate.py --section sensitivity    # weight robustness
 python scripts/evaluate.py --section ab             # session-aware vs baseline
+
+python scripts/evaluate.py --dataset curated        # the original 30 tracks
 ```
 
 The suite has three parts, each producing report-ready output:
 
-1. **Recommender vs random** — across five scenarios, the recommender scores
-   ~+267% above the average random pick and never repeats a history track.
+1. **Recommender vs random** — across five scenarios the recommender averages
+   **0.962** against **0.728** for the average random pick (**+32.3%**), and
+   never repeats a history track.
 2. **Weight sensitivity analysis** — scales each feature weight by ±25–50% (one
    at a time) and checks whether the top recommendation changes. It stays stable
-   ~88% of the time, and the sensitivity is confined to the low-weight
+   **94.0%** of the time, and the sensitivity is confined to the low-weight
    tie-breakers (tempo, popularity), while the dominant genre weight can vary by
    ±50% without changing the pick — evidence the chosen weights behave as
    intended.
 3. **Session-aware vs baseline (A/B)** — plays seeded sessions with no explicit
    preferences and measures *session coherence* (a metric independent of the
-   recommender's own objective). Session-aware keeps genre coherence at 100% vs
-   ~8% for the explicit-only baseline, confirming the history-based upgrade works.
+   recommender's own objective). Session-aware holds genre coherence at
+   **100% vs 8.3%**, mood at **90% vs 36.7%** and artist affinity at
+   **53.3% vs 0%**, confirming the history-based upgrade works.
+
+### Why the margin over random is modest — and why that is the honest number
+
+`--dataset` re-runs the comparison on either catalogue, because the two give
+very different-looking results:
+
+| Catalogue | Recommender | Random | Improvement |
+|---|---|---|---|
+| `full` (395 tracks) | 0.962 | 0.728 | **+32.3%** |
+| `curated` (30 tracks) | 0.962 | 0.931 | **+3.8%** |
+
+Two things drive this, and both make the baseline *harder*, not the recommender
+worse. First, an explicit genre or mood is now a **hard filter**, so the random
+baseline draws from the already-relevant pool rather than the whole catalogue —
+"random among relevant" is a far stronger opponent than "random among
+everything". Second, on only 30 tracks the filtered pool is tiny, so random
+nearly ties the recommender (three of the five scenarios reach +0.0%); the
+395-track catalogue is what gives the recommender room to discriminate.
+
+Earlier drafts of this project reported a much larger margin (≈ +220%) measured
+against a random pick over the *unfiltered* 30-track catalogue. That figure is
+not reproducible under the current design and should not be quoted: the
+comparison it describes no longer exists.
 
 ## User study (in-app ratings)
 
@@ -219,13 +291,25 @@ every seed track yields a valid record.
 # keyless dry run over a few tracks (prints results, writes nothing):
 python scripts/enrich_dataset.py --limit 5 --dry-run
 
-# full keyless build -> app/data/tracks.enriched.json (preview, 92 tracks):
+# keyless build from the hand seeds alone -> 92 tracks:
 python scripts/enrich_dataset.py
 
-# with popularity + youtube ids (put keys in .env; see .env.example) and merge
-# the real tracks into the bundled dataset (backs up the original first):
-python scripts/enrich_dataset.py --apply
+# how the SHIPPED 395-track catalogue was built (needs keys in .env):
+#   --per-genre 40  also pulls the top 40 Last.fm tracks per genre, which is
+#                   what takes the catalogue past the 92 hand seeds
+#   --similar       also builds app/data/artist_similarity.json
+#   --apply         merges the real tracks into app/data/tracks.json,
+#                   rebuilding it from tracks.curated.json each time
+python scripts/enrich_dataset.py --per-genre 40 --similar --apply
 ```
+
+**On YouTube quota.** A `search.list` call costs 100 units against a default
+10,000/day allowance, so roughly **100 tracks can gain a playable video per
+day**. That is why 190 of 395 tracks are currently playable rather than all of
+them; re-running on a later day extends the coverage. The API's
+`videoEmbeddable` flag is not sufficient on its own — some videos it reports as
+embeddable still refuse to play with error 150 — so ids are verified in a real
+embed before being added, and known-bad ones are kept in `YOUTUBE_BLOCKLIST`.
 
 ## Example API request and response
 
@@ -247,11 +331,12 @@ python scripts/enrich_dataset.py --apply
     "genre": "rock", "tempo": 138, "mood": "energetic",
     "year": 2017, "popularity": 72
   },
-  "score": 0.7453,
-  "explanation": "Recommended \"Wildfire\" because it matches the preferred genre rock, matches the energetic mood, is close to the target tempo, and is a popular track.",
-  "score_breakdown": { "genre": 0.4, "artist": 0.0, "tempo": 0.1733, "mood": 0.1, "popularity": 0.072 },
+  "score": 0.962,
+  "explanation": "Recommended \"Wildfire\" because it matches the preferred genre rock, matches the energetic mood, matches the preferred artist The Hours, is close to the target tempo, and is a popular track.",
+  "score_breakdown": { "genre": 0.4, "artist": 0.2, "tempo": 0.19, "mood": 0.1, "popularity": 0.072 },
   "ranked_alternatives": [
-    { "id": "t10", "title": "Breaking Static", "score": 0.7367 }
+    { "id": "r008", "title": "Seven Nation Army", "score": 0.7733 },
+    { "id": "r004", "title": "Mr. Brightside", "score": 0.77 }
   ]
 }
 ```
@@ -289,20 +374,38 @@ the A/B comparison used in evaluation and user testing.
 
 This is **better than random** because it provably maximizes a stated
 preference-similarity objective and never repeats a heard track — verified by
-`scripts/evaluate.py` (≈ +220% average score over random in testing).
+`scripts/evaluate.py` (+32.3% over a random-among-relevant baseline; see the
+evaluation section for why that margin is the honest one).
 
 ## Known limitations
 
-- Small bundled dataset (30 tracks) intended for demonstration.
+- Demonstration-scale catalogue (395 tracks, 190 of them playable). At this
+  size high genre coherence is easier than it would be over a production
+  catalogue, so the coherence figures show the mechanism works rather than
+  proving behaviour at scale.
+- Only 190 tracks carry a playable video: the YouTube Data API allows roughly
+  100 lookups per day on the free quota, so coverage grows a day at a time.
 - Exact-match scoring for genre/mood/artist (no fuzzy or semantic similarity).
 - Evaluation measures the recommender against its own scoring objective, not
   human-judged musical quality.
-- No persistence and no external metadata in the MVP (by design).
+- The recommendation path stores nothing and calls no external service at
+  request time; enrichment happens offline and study ratings are written by a
+  separate module that is never read back into the recommender.
 
 ## Future improvements
 
-- Enrich the dataset from external sources (Spotify / MusicBrainz) offline.
-- Infer taste from the listening history when explicit preferences are sparse.
-- Add diversity/novelty controls and partial (fuzzy) genre matching.
-- Add a small web demo and a user-study-based evaluation.
-- Optional SQLite storage for larger catalogs.
+Four items previously listed here — offline external enrichment, history-based
+taste inference, diversity controls, and the web demo — are now implemented and
+are described above. What remains:
+
+- **Partial (fuzzy) genre matching** — "rock" and "indie rock" currently do not
+  match, which is transparent but coarse.
+- **Learn the feature weights from collected study data** rather than setting
+  them by hand, then re-test them.
+- **Complete the user study.** The apparatus, protocol and analysis are built
+  and validated (`Draftwork/USER_STUDY_PLAN.md`,
+  `Draftwork/FACILITATOR_SHEET.md`, `scripts/analyze_feedback.py`); the study
+  with participants has not yet been run, so no participant results are
+  reported.
+- **Extend playable coverage** beyond 190 tracks as YouTube quota allows.
+- **Optional SQLite storage** for larger catalogues.

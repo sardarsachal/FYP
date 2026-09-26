@@ -11,8 +11,8 @@ the recommendation logic.
 import json
 from pathlib import Path
 
-# The fields every track must contain. The recommendation engine (built in
-# a later milestone) relies on all of these being present and correctly typed.
+# The fields every track must contain. The recommendation engine relies on
+# all of these being present and correctly typed.
 REQUIRED_FIELDS = {
     "id": str,
     "title": str,

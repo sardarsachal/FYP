@@ -1,8 +1,11 @@
 """
 API routes for NextTrack.
 
-- GET  /health     liveness check (Milestone 1)
-- POST /recommend  recommend the next track (Milestone 6)
+- GET  /            the single-page web demo
+- GET  /health      liveness check (Milestone 1)
+- GET  /catalogue   the bundled catalogue + genre/mood vocabularies
+- POST /recommend   recommend the next track (Milestone 6)
+- POST /feedback    record one anonymous user-study rating
 
 The /recommend route is deliberately thin: it validates input (via the
 RecommendRequest schema), loads candidates (from the request or the local
