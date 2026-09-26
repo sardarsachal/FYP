@@ -9,8 +9,10 @@ plain-English explanation of *why* it was chosen.
 > **Status:** Working API (`/health`, `/recommend`, `/catalogue`, `/feedback`),
 > an interactive **web app** with an embedded music player, a 395-track dataset
 > enriched from external sources (MusicBrainz / AcousticBrainz / Last.fm /
-> YouTube) of which 190 are playable, 92 passing automated tests, and a
-> reproducible three-part evaluation suite.
+> YouTube) of which 190 are playable, 98 passing automated tests, a
+> reproducible three-part offline evaluation suite, and a completed blind A/B
+> **user study** (3 participants, 30 ratings) whose result contradicted the
+> offline metrics and drove a change to the recommender.
 >
 > **Web demo:** run the server (below) and open <http://localhost:8000>.
 > Use `localhost`, **not** `127.0.0.1` — YouTube refuses to play embedded
@@ -298,6 +300,54 @@ history-based adaptation being tested. `scripts/analyze_feedback.py` reports
 per-participant means alongside design checks (assignment balance and rating
 pacing), so the validity of a collected run can be read straight off the data.
 
+### Results — the hypothesis was rejected
+
+Three participants, 30 ratings, two sessions each. Full output in
+`results/user_study.txt`; the raw anonymous records are in
+`results/user_study_ratings.jsonl`.
+
+| Condition | n | Mean rating | SD |
+|---|---|---|---|
+| Session-aware | 14 | **2.36** | 1.60 |
+| Baseline | 16 | **4.00** | 1.55 |
+
+Mann–Whitney **U = 52.5, p = 0.0100** — significant at α = 0.05, with a large
+effect (rank-biserial *r* = +0.531). All three participants agreed in
+direction (−1.60, −0.80, −2.83).
+
+**The hypothesis that listeners prefer session-aware recommendations is
+rejected, and the baseline was significantly preferred.** Every offline metric
+in this project favours session-awareness; the listeners did not.
+
+**Why.** Session-aware used **5 distinct artists across 14 tracks**, against
+the baseline's **9 across 16**. Within a participant's own session a repeated
+artist cost session-aware **1.18 rating points** (2.78 → 1.60) but the
+baseline only **0.29** (4.09 → 3.80). The session-affinity bonus was pulling
+the same artist back repeatedly, and listeners heard that as monotony.
+
+The session-coherence metric had scored exactly this behaviour as a *success*
+(artist affinity 53.3% vs 0%). It was measuring something real but treating
+more of it as always better — the gap between an accuracy proxy and perceived
+quality described by McNee, Riedl and Konstan (2006), observed here on this
+system.
+
+The artist repeat cap described above is the response to this finding. It is
+justified by the study data and by simulation, but it was introduced *after*
+these sessions and **has not been re-tested with participants** — so whether
+it actually improves perceived quality is still an open question.
+
+**Data quality and limits.** Median rating latency 20.8s with 0 of 29 gaps
+under 3 seconds, so every rating followed an actual listen; assignment balance
+was 5/5, 5/5 and 4/6. But this is a convenience sample of three, the catalogue
+is chart-seeded so most tracks were familiar, ratings are relative to the
+session rather than absolute quality, and no post-session questionnaire was
+administered — so no claim is made about explanation clarity, trust or
+usability. The result is indicative, not generalisable.
+
+> **Build provenance.** All 30 ratings predate the artist repeat cap. The
+> offline figures elsewhere in this README are from the current (post-cap)
+> build, so the two sets describe different versions of the recommender.
+
 ## Dataset enrichment (real tracks from external sources)
 
 The bundled dataset can be extended with **real tracks** whose metadata is
@@ -437,9 +487,15 @@ are described above. What remains:
   match, which is transparent but coarse.
 - **Learn the feature weights from collected study data** rather than setting
   them by hand, then re-test them.
-- **Complete the user study.** The apparatus and analysis are built and
-  validated (study mode in the web app, `POST /feedback`,
-  `scripts/analyze_feedback.py`); the study with participants has not yet been
-  run, so no participant results are reported.
+- **Re-test the artist repeat cap with participants.** The user study has
+  been run (see above) and motivated the cap, but the cap itself was
+  introduced afterwards and has not been put in front of listeners. Re-running
+  the same blind A/B against the capped build is the immediate next step.
+- **Recruit a larger, less familiar sample.** Three participants on a
+  chart-seeded catalogue is indicative only; a larger sample and less familiar
+  music would separate session fit from track familiarity.
+- **Investigate whether artist repetition is the whole story.** It is the
+  best-evidenced cause, but session-awareness also narrows genre and mood,
+  which may contribute to the monotony participants reported.
 - **Extend playable coverage** beyond 190 tracks as YouTube quota allows.
 - **Optional SQLite storage** for larger catalogues.
