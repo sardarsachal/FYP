@@ -1,0 +1,70 @@
+NextTrack — user study results
+Generated: 2026-09-26 14:31 UTC
+Data file: study_data/feedback.study1-precap.jsonl
+
+BUILD PROVENANCE
+------------------------------------------------------------
+All 30 ratings were collected on a single build, BEFORE the artist
+repeat cap (ARTIST_AFFINITY_REPEAT_LIMIT) was introduced. The cap was
+added in response to these results and has NOT been tested with
+participants. The offline metrics in evaluation_full.txt are from the
+post-cap build, so the two files describe different versions: the user
+study evaluates the system as it behaved during the sessions below.
+
+DESIGN
+------------------------------------------------------------
+Within-subjects, blind A/B. Method assigned by block randomisation so
+each participant receives an equal number of each condition. In study
+mode the app sends no explicit preferences and holds diversity constant
+at 0.3, so the only difference between conditions is history-based
+adaptation. Explanation and score breakdown are hidden. Participants
+rated 'how well did this track fit your session?' on 1-5.
+Convenience sample, 3 participants, 2 sessions each.
+
+RESULT
+------------------------------------------------------------
+Session-aware : mean 2.36  sd 1.60  n=14
+Baseline      : mean 4.00  sd 1.55  n=16
+Difference    : -1.64 points on a 1-5 scale
+Mann-Whitney U = 52.5, p = 0.0100  -> significant at alpha = 0.05
+Rank-biserial effect size r = +0.531 (large)
+
+H1 (listeners rate session-aware higher) is REJECTED. The effect is
+significant in the OPPOSITE direction: the baseline was preferred.
+
+PER PARTICIPANT (all three agree in direction)
+------------------------------------------------------------
+P       n   aware  baseline    diff
+U1     10    2.60      4.20   -1.60
+U2     10    3.20      4.00   -0.80
+U3     10    1.00      3.83   -2.83
+
+MECHANISM: ARTIST OVER-REPETITION
+------------------------------------------------------------
+session_aware  5 distinct artists across 14 tracks
+baseline       9 distinct artists across 16 tracks
+session_aware  first appearance 2.78 (n=9) | artist repeated within the same session 1.60 (n=5)
+baseline       first appearance 4.09 (n=11) | artist repeated within the same session 3.80 (n=5)
+
+The offline session-coherence metric scored this same repetition as a
+success (artist affinity 53.3% vs 0% for the baseline). The metric was
+measuring a real behaviour but treating more of it as always better -
+the accuracy-proxy gap described by McNee, Riedl and Konstan (2006).
+
+DATA QUALITY
+------------------------------------------------------------
+Rating latency: median 20.8s, 0/29 under 3s, 28/29 at 10s or more
+Assignment balance per participant: 5/5, 5/5, 4/6 (a warm-up or skipped
+recommendation consumes an assignment without producing a rating).
+
+LIMITATIONS
+------------------------------------------------------------
+- 3 participants, 30 ratings, convenience sample: indicative, not
+  generalisable.
+- The catalogue is Last.fm chart-seeded, so most tracks were familiar to
+  participants; familiarity may influence ratings independently of fit.
+- Ratings are relative to the session, not absolute musical quality.
+- No post-session questionnaire was administered, so no claim is made
+  about explanation clarity, trust, or usability.
+- The artist repeat cap introduced in response to these findings has not
+  been re-tested with participants.
