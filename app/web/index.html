@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>NextTrack — stateless music recommendations</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #181b22; --panel-2: #1f232c; --line: #2a2f3a;
+    --text: #e8eaed; --muted: #9aa3b2; --accent: #6ee7b7; --accent-2: #60a5fa;
+    --bar: #3b82f6; --warn: #f59e0b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  header {
+    padding: 18px 24px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  }
+  header h1 { margin: 0; font-size: 20px; letter-spacing: .3px; }
+  header .tag { color: var(--muted); font-size: 13px; }
+  .privacy {
+    margin-left: auto; font-size: 12px; color: var(--accent);
+    border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px;
+  }
+  main {
+    display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px;
+    padding: 20px 24px; max-width: 1200px; margin: 0 auto;
+  }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 14px; padding: 18px;
+  }
+  .panel h2 { margin: 0 0 14px; font-size: 13px; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--muted); }
+
+  /* Now playing */
+  #player-wrap { position: relative; padding-top: 56.25%; border-radius: 10px;
+    overflow: hidden; background: #000; margin-bottom: 14px; }
+  #player { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  /* Shown when YouTube refuses to play a video in an embed (region block,
+     owner restriction, or an extension blocking the frame). */
+  #player-fallback { position: absolute; inset: 0; display: none; flex-direction: column;
+    align-items: center; justify-content: center; gap: 10px; text-align: center;
+    padding: 18px; background: #000; color: var(--text); }
+  #player-fallback.show { display: flex; }
+  #player-fallback .pf-msg { font-size: 13px; color: var(--muted); max-width: 46ch; line-height: 1.5; }
+  #player-fallback .pf-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  #player-fallback a, #player-fallback button { font: inherit; font-size: 13px; cursor: pointer;
+    border-radius: 8px; padding: 8px 14px; border: 1px solid var(--line);
+    background: var(--panel-2); color: var(--text); text-decoration: none; }
+  #player-fallback a:hover, #player-fallback button:hover { border-color: var(--accent); }
+  .np-title { font-size: 20px; font-weight: 600; }
+  .np-artist { color: var(--muted); margin-bottom: 10px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .chip { font-size: 12px; background: var(--panel-2); border: 1px solid var(--line);
+    border-radius: 999px; padding: 3px 10px; color: var(--muted); }
+  .chip b { color: var(--text); font-weight: 600; }
+
+  .explain { background: var(--panel-2); border-left: 3px solid var(--accent);
+    padding: 10px 14px; border-radius: 6px; margin: 12px 0; font-size: 14px; }
+  .empty { color: var(--muted); text-align: center; padding: 30px 10px; }
+  .hint { color: var(--muted); font-size: 12px; text-align: center; margin: -6px 0 10px; }
+
+  /* Rating widget */
+  .rate { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 14px; margin: 12px 0; }
+  .rate p { margin: 0 0 8px; font-size: 14px; }
+  .rate .stars { display: flex; gap: 8px; }
+  .rate button { flex: 1; padding: 10px 0; font-size: 15px; font-weight: 600;
+    background: var(--panel); color: var(--text); border: 1px solid var(--line);
+    border-radius: 8px; cursor: pointer; }
+  .rate button:hover { border-color: var(--accent); color: var(--accent); }
+  .rate .scale { display: flex; justify-content: space-between; color: var(--muted);
+    font-size: 11px; margin-top: 6px; }
+  .rate.done { color: var(--accent); text-align: center; font-size: 14px; }
+
+  /* Score breakdown bars */
+  .bd-row { display: grid; grid-template-columns: 84px 1fr 52px;
+    align-items: center; gap: 10px; margin: 6px 0; font-size: 13px; }
+  .bd-label { color: var(--muted); text-transform: capitalize; }
+  .bd-track { background: var(--panel-2); border-radius: 5px; height: 10px; overflow: hidden; }
+  .bd-fill { height: 100%; background: var(--bar); border-radius: 5px; transition: width .3s; }
+  .bd-val { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .bd-total { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line);
+    font-weight: 600; }
+
+  /* Controls */
+  label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 5px; }
+  select, input[type=text] {
+    width: 100%; background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; font-size: 14px;
+  }
+  input[type=range] { width: 100%; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .check { display: flex; align-items: flex-start; gap: 8px; margin-top: 14px;
+    color: var(--text); font-size: 13px; cursor: pointer; }
+  .check input { margin-top: 2px; accent-color: var(--accent); }
+  .val { color: var(--text); font-variant-numeric: tabular-nums; }
+  details { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 8px; }
+  summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  .weights .bd-row { grid-template-columns: 84px 1fr 36px; }
+
+  .btn {
+    width: 100%; margin-top: 16px; padding: 13px; font-size: 15px; font-weight: 600;
+    color: #07130d; background: var(--accent); border: 0; border-radius: 10px; cursor: pointer;
+  }
+  .btn:hover { filter: brightness(1.05); }
+  .btn.secondary { background: transparent; color: var(--muted);
+    border: 1px solid var(--line); margin-top: 8px; }
+  .msg { margin-top: 10px; font-size: 13px; color: var(--warn); min-height: 18px; }
+
+  /* History */
+  .hist { list-style: none; margin: 0; padding: 0; }
+  .hist li { display: flex; gap: 10px; align-items: center; padding: 7px 0;
+    border-bottom: 1px solid var(--line); font-size: 14px; }
+  .hist .n { color: var(--muted); font-variant-numeric: tabular-nums; width: 20px; }
+  .hist .t { flex: 1; }
+  .hist .a { color: var(--muted); font-size: 12px; }
+  .foot { color: var(--muted); font-size: 12px; text-align: center; padding: 8px 24px 28px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎧 NextTrack</h1>
+  <span class="tag">Stateless, explainable next-track recommendations</span>
+  <span class="privacy">No account · No tracking · Computed per request</span>
+</header>
+
+<main>
+  <!-- LEFT: now playing + explanation -->
+  <section class="panel">
+    <h2>Now playing</h2>
+    <div id="player-wrap">
+      <div id="player"></div>
+      <div id="player-fallback">
+        <div class="pf-msg" id="pf-msg"></div>
+        <div class="pf-actions">
+          <a id="pf-yt" href="#" target="_blank" rel="noopener">Watch on YouTube &#8599;</a>
+          <button type="button" id="pf-skip">Skip to next &#9654;</button>
+        </div>
+      </div>
+    </div>
+    <div class="hint" id="playHint">Tip: your browser may block autoplay — press ▶ on the first track, and the rest play automatically.</div>
+    <div id="np">
+      <div class="empty">Set your preferences, then press <b>Recommend&nbsp;next&nbsp;▶</b>.</div>
+    </div>
+    <div id="rating"></div>
+    <div id="explain-wrap"></div>
+    <div id="breakdown"></div>
+  </section>
+
+  <!-- RIGHT: controls + history -->
+  <section>
+    <div class="panel">
+      <h2>Your preferences</h2>
+      <div class="row">
+        <div>
+          <label for="genre">Genre</label>
+          <select id="genre"><option value="">Any</option></select>
+        </div>
+        <div>
+          <label for="mood">Mood</label>
+          <select id="mood"><option value="">Any</option></select>
+        </div>
+      </div>
+      <label for="tempo">Target tempo — <span class="val" id="tempoVal">120</span> BPM</label>
+      <input type="range" id="tempo" min="60" max="200" value="120" />
+      <label for="diversity">Variety / discovery — <span class="val" id="divVal">30</span>%</label>
+      <input type="range" id="diversity" min="0" max="100" value="30" />
+      <label for="artist">Preferred artist (optional)</label>
+      <input type="text" id="artist" placeholder="e.g. Queen" />
+
+      <label class="check">
+        <input type="checkbox" id="sessionAware" checked />
+        Adapt to my session — learn genre, mood &amp; artists from what I've played
+      </label>
+
+      <label class="check">
+        <input type="checkbox" id="studyMode" />
+        🔬 Study mode (blind A/B) — hides the method and asks you to rate each track
+      </label>
+      <div id="studyBox" style="display:none">
+        <label for="participant">Participant label (facilitator)</label>
+        <input type="text" id="participant" placeholder="e.g. P3" />
+      </div>
+      <div id="studyNote" class="hint" style="display:none; text-align:left; margin-top:8px; color:var(--accent)">
+        Study mode runs a controlled blind comparison — the preferences above are
+        ignored so the only difference between the two methods is session learning.
+      </div>
+
+      <details>
+        <summary>Advanced: feature weights</summary>
+        <div class="weights" id="weights"></div>
+        <button class="btn secondary" id="resetWeights">Reset weights</button>
+      </details>
+
+      <button class="btn" id="recommend">Recommend next ▶</button>
+      <div class="msg" id="msg"></div>
+      <button class="btn secondary" id="reset">Reset session</button>
+    </div>
+
+    <div class="panel" style="margin-top:20px">
+      <h2>Session history <span id="histCount" class="tag"></span></h2>
+      <ul class="hist" id="hist"><li class="empty" style="border:0">Nothing played yet.</li></ul>
+    </div>
+  </section>
+</main>
+
+<p class="foot">
+  History lives only in your browser and is sent with each request — the server stores nothing between calls.
+</p>
+
+<script>
+const WEIGHT_KEYS = ["genre", "artist", "tempo", "mood", "popularity"];
+const DEFAULT_WEIGHTS = { genre: 40, artist: 20, tempo: 20, mood: 10, popularity: 10 };
+
+let history = [];          // track ids played this session (client-side only)
+// Named ytPlayer, not player: an element with id="player" is exposed as
+// window.player by named access, and the two are easy to confuse.
+let ytPlayer = null;       // YouTube IFrame player
+let pendingVideoId = null; // if a track arrives before the player is ready
+let currentVideoId = null; // for the "Watch on YouTube" fallback link
+
+// Anonymous, per-browser-session id for grouping study ratings. Not tied to any
+// identity and never stored server-side except inside a rating record.
+let SESSION_ID = newSessionId();
+function newSessionId() {
+  return (crypto.randomUUID && crypto.randomUUID()) ||
+         ("s" + Date.now() + Math.random().toString(16).slice(2));
+}
+let lastRec = null;        // context of the current recommendation, for rating
+
+// ---- YouTube IFrame API ----
+// Error codes the IFrame API reports via onError. 101 and 150 are the same
+// condition (the uploader disallows embedded playback); 150 is what the
+// obfuscated player actually sends.
+const YT_ERRORS = {
+  2:   "YouTube rejected this video id.",
+  5:   "This video can't play in your browser's HTML5 player.",
+  100: "This video has been removed or made private.",
+  101: "The uploader doesn't allow this video to be played inside other sites.",
+  150: "The uploader doesn't allow this video to be played inside other sites.",
+};
+
+// YouTube refuses to play embeds whose page is served from a bare IP address,
+// reporting it as error 150 on every track. Serving the same page from
+// localhost fixes it, so say that instead of blaming the video.
+function isIpHost() {
+  return /^\d{1,3}(\.\d{1,3}){3}$/.test(location.hostname);
+}
+
+function showPlaybackError(code) {
+  let msg;
+  if ((code === 150 || code === 101) && isIpHost()) {
+    msg = "YouTube blocks embedded playback on pages served from an IP address (" +
+          location.hostname + "). Open this demo at " +
+          location.href.replace(location.hostname, "localhost") + " instead.";
+  } else {
+    msg = (YT_ERRORS[code] || ("Playback failed (YouTube error " + code + ").")) +
+          " The recommendation itself is still valid \u2014 open it on YouTube, or skip to the next track.";
+  }
+  document.getElementById("pf-msg").textContent = msg;
+  const link = document.getElementById("pf-yt");
+  link.href = currentVideoId ? "https://www.youtube.com/watch?v=" + currentVideoId : "#";
+  document.getElementById("player-fallback").classList.add("show");
+}
+function hidePlaybackError() {
+  document.getElementById("player-fallback").classList.remove("show");
+}
+
+function onYouTubeIframeAPIReady() {
+  ytPlayer = new YT.Player("player", {
+    // Deliberately no videoId: the player is created empty and the first
+    // recommendation is loaded with loadVideoById. Seeding a placeholder video
+    // here made YouTube return error 150 for the next loadVideoById call.
+    // Don't set an origin playerVar here: the IFrame API already appends the
+    // correct origin to the embed URL, and passing it again makes YouTube
+    // refuse playback with error 150.
+    playerVars: { rel: 0, modestbranding: 1, playsinline: 1 },
+    events: {
+      onReady: () => {
+        if (pendingVideoId) { ytPlayer.loadVideoById(pendingVideoId); pendingVideoId = null; }
+      },
+      onError: e => showPlaybackError(e.data),
+      // Any successful load clears a stale error overlay.
+      onStateChange: e => { if ([1, 3, 5].indexOf(e.data) !== -1) hidePlaybackError(); },
+    }
+  });
+}
+(function loadYT() {
+  const s = document.createElement("script");
+  s.src = "https://www.youtube.com/iframe_api";
+  document.head.appendChild(s);
+})();
+
+function playVideo(id) {
+  if (!id) return;
+  currentVideoId = id;
+  hidePlaybackError();
+  // The YouTube IFrame API loads asynchronously, so on the very first click the
+  // player may exist but not yet be ready. Queue the id and let onReady play it,
+  // and never let a player hiccup abort the rest of renderTrack.
+  try {
+    if (ytPlayer && typeof ytPlayer.loadVideoById === "function" && typeof ytPlayer.getPlayerState === "function") {
+      ytPlayer.loadVideoById(id);
+      // Belt-and-suspenders: some browsers cue but don't start. If the browser
+      // blocks autoplay (common for embeds on localhost until the user has
+      // interacted with the player once), this is a no-op and the user just
+      // presses the player's ▶ once — after that, later tracks autoplay.
+      setTimeout(() => { try { ytPlayer.playVideo(); } catch (e) {} }, 300);
+    } else {
+      pendingVideoId = id;
+    }
+  } catch (e) {
+    pendingVideoId = id;
+  }
+}
+
+// ---- Build the weight sliders ----
+function buildWeights() {
+  const box = document.getElementById("weights");
+  box.innerHTML = "";
+  WEIGHT_KEYS.forEach(k => {
+    const row = document.createElement("div");
+    row.className = "bd-row";
+    row.innerHTML =
+      `<span class="bd-label">${k}</span>` +
+      `<input type="range" min="0" max="100" value="${DEFAULT_WEIGHTS[k]}" data-w="${k}" />` +
+      `<span class="bd-val" id="wv-${k}">${DEFAULT_WEIGHTS[k]}</span>`;
+    box.appendChild(row);
+  });
+  box.querySelectorAll("input[data-w]").forEach(inp => {
+    inp.addEventListener("input", e => {
+      document.getElementById("wv-" + e.target.dataset.w).textContent = e.target.value;
+    });
+  });
+}
+function currentWeights() {
+  const w = {};
+  document.querySelectorAll("input[data-w]").forEach(i => w[i.dataset.w] = Number(i.value));
+  return w;
+}
+
+// ---- Populate genre/mood from the catalogue ----
+async function loadCatalogue() {
+  const res = await fetch("/catalogue?playable_only=true");
+  const data = await res.json();
+  const gsel = document.getElementById("genre"), msel = document.getElementById("mood");
+  data.genres.forEach(g => gsel.add(new Option(g, g)));
+  data.moods.forEach(m => msel.add(new Option(m, m)));
+}
+
+// ---- Read the preference controls into a request payload ----
+function currentPreferences() {
+  const p = { weights: currentWeights() };
+  const g = document.getElementById("genre").value;
+  const m = document.getElementById("mood").value;
+  const a = document.getElementById("artist").value.trim();
+  if (g) p.genre = g;
+  if (m) p.mood = m;
+  if (a) p.preferred_artist = a;
+  p.target_tempo = Number(document.getElementById("tempo").value);
+  p.session_aware = document.getElementById("sessionAware").checked;
+  p.diversity = Number(document.getElementById("diversity").value) / 100;
+  return p;
+}
+
+// ---- Render the recommended track ----
+function renderTrack(r, meta) {
+  const t = r.recommended_track;
+  playVideo(t.youtube_id);
+
+  document.getElementById("np").innerHTML =
+    `<div class="np-title">${escapeHtml(t.title)}</div>` +
+    `<div class="np-artist">${escapeHtml(t.artist)}</div>` +
+    `<div class="chips">` +
+      chip("Genre", t.genre) + chip("Mood", t.mood) +
+      chip("Tempo", t.tempo + " BPM") + chip("Year", t.year) +
+      chip("Popularity", t.popularity) +
+    `</div>`;
+
+  // In blind study mode we hide the explanation and score breakdown, because
+  // the session-aware wording ("from your session") would reveal which method
+  // produced the track and bias the rating.
+  if (meta.blind) {
+    document.getElementById("explain-wrap").innerHTML = "";
+    document.getElementById("breakdown").innerHTML = "";
+  } else {
+    document.getElementById("explain-wrap").innerHTML =
+      `<div class="explain">${escapeHtml(r.explanation)}</div>`;
+    renderBreakdown(r.score_breakdown, r.score);
+  }
+
+  addHistory(t);
+  history.push(t.id);
+
+  // Record the context so a rating can be attributed to this recommendation.
+  lastRec = {
+    track_id: t.id, mode: meta.mode, history_length: meta.historyLength,
+    explicit_prefs: meta.explicitPrefs, score: r.score,
+  };
+  renderRating(meta.blind);
+}
+
+// ---- Rating widget ----
+function renderRating(blind) {
+  const box = document.getElementById("rating");
+  const prompt = blind ? "How well did this track fit your session?"
+                       : "Rate this recommendation:";
+  let html = `<div class="rate"><p>${prompt}</p><div class="stars">`;
+  for (let n = 1; n <= 5; n++) html += `<button data-rate="${n}">${n}</button>`;
+  html += `</div><div class="scale"><span>1 · poor</span><span>5 · great</span></div></div>`;
+  box.innerHTML = html;
+  box.querySelectorAll("button[data-rate]").forEach(b =>
+    b.addEventListener("click", () => submitRating(Number(b.dataset.rate))));
+}
+
+async function submitRating(rating) {
+  if (!lastRec) return;
+  const participant = participantLabel() || null;
+  const payload = { session_id: SESSION_ID, rating, participant, ...lastRec };
+  document.getElementById("rating").innerHTML =
+    `<div class="rate done">✓ Rated ${rating}/5 — thanks. Press “Recommend next” to continue.</div>`;
+  try {
+    await fetch("/feedback", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+  } catch (e) { /* rating is best-effort; ignore network errors */ }
+}
+
+function chip(label, val) { return `<span class="chip">${label} <b>${escapeHtml(String(val))}</b></span>`; }
+
+function renderBreakdown(bd, total) {
+  const max = Math.max(...Object.values(bd), 0.001);
+  let html = `<div class="panel" style="margin-top:14px;background:var(--panel-2)">` +
+             `<h2>Why this track — score breakdown</h2>`;
+  WEIGHT_KEYS.forEach(k => {
+    const v = bd[k] ?? 0;
+    const pct = Math.round((v / max) * 100);
+    html += `<div class="bd-row"><span class="bd-label">${k}</span>` +
+            `<div class="bd-track"><div class="bd-fill" style="width:${pct}%"></div></div>` +
+            `<span class="bd-val">${v.toFixed(3)}</span></div>`;
+  });
+  html += `<div class="bd-row bd-total"><span class="bd-label" style="color:var(--text)">Total</span>` +
+          `<div></div><span class="bd-val" style="color:var(--accent)">${total.toFixed(3)}</span></div></div>`;
+  document.getElementById("breakdown").innerHTML = html;
+}
+
+function addHistory(t) {
+  const ul = document.getElementById("hist");
+  if (history.length === 0) ul.innerHTML = "";
+  const li = document.createElement("li");
+  li.innerHTML = `<span class="n">${history.length + 1}</span>` +
+                 `<span class="t">${escapeHtml(t.title)}<div class="a">${escapeHtml(t.artist)}</div></span>`;
+  ul.prepend(li);
+  document.getElementById("histCount").textContent = `(${history.length + 1})`;
+}
+
+// ---- Blind A/B assignment (block randomised) ----
+// A plain per-recommendation coin flip gives badly unbalanced splits at the
+// sample sizes a coursework study reaches: the pilot produced 7 session-aware
+// vs 4 baseline in 11 ratings, which wastes statistical power. Drawing without
+// replacement from a shuffled [session_aware, baseline] block keeps the two
+// conditions equal as the session grows, while leaving the order unpredictable
+// and the method just as hidden from the participant.
+let methodBag = [];
+let bagOwner = null;   // participant the current bag belongs to
+
+function shuffled(items) {
+  const a = items.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// Exposed for testing and for the pre-flight balance check.
+function nextMethodAware(participant) {
+  // A new participant starts a fresh block, so balance is per participant
+  // rather than pooled across everyone in one browser session.
+  if (participant !== bagOwner) { bagOwner = participant; methodBag = []; }
+  if (methodBag.length === 0) methodBag = shuffled([true, false]);
+  return methodBag.pop();
+}
+
+// Facilitator label, normalised so "p3", "P3 " and "P3" don't become three
+// different participants the way "user1"/"User3" did in the pilot.
+function participantLabel() {
+  return document.getElementById("participant").value.trim().toUpperCase();
+}
+
+// ---- Main action ----
+async function recommendNext() {
+  const msg = document.getElementById("msg");
+  msg.textContent = "";
+
+  const blind = document.getElementById("studyMode").checked;
+  let preferences, mode, explicitPrefs;
+  if (blind) {
+    // In study mode the participant label is required: unlabelled ratings can't
+    // be attributed to anyone afterwards, which is how the pilot ended up with
+    // 3 of 11 records unusable.
+    if (!participantLabel()) {
+      msg.textContent = "Enter a participant label (P1, P2, …) before recommending.";
+      document.getElementById("participant").focus();
+      return;
+    }
+    // Blind A/B: block-randomised method, and NO explicit preferences, so the
+    // only difference between conditions is history-based adaptation.
+    // Diversity is held CONSTANT across both conditions (not zero) so the study
+    // experience isn't monotonous and variety can't confound the comparison.
+    const aware = nextMethodAware(participantLabel());
+    preferences = { session_aware: aware, diversity: 0.3 };
+    mode = aware ? "session_aware" : "baseline";
+    explicitPrefs = false;
+  } else {
+    preferences = currentPreferences();
+    mode = preferences.session_aware ? "session_aware" : "baseline";
+    explicitPrefs = !!(preferences.genre || preferences.mood || preferences.preferred_artist);
+  }
+  const reqHistoryLength = history.length;
+
+  try {
+    const res = await fetch("/recommend?playable_only=true", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ history, preferences })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      msg.textContent = (data.error && data.error.message) || "No track could be recommended.";
+      return;
+    }
+    renderTrack(data, { mode, historyLength: reqHistoryLength, explicitPrefs, blind });
+  } catch (e) {
+    msg.textContent = "Request failed — is the server running?";
+  }
+}
+
+function resetSession() {
+  history = [];
+  hidePlaybackError();
+  currentVideoId = null;
+  document.getElementById("hist").innerHTML =
+    `<li class="empty" style="border:0">Nothing played yet.</li>`;
+  document.getElementById("histCount").textContent = "";
+  document.getElementById("np").innerHTML =
+    `<div class="empty">Set your preferences, then press <b>Recommend&nbsp;next&nbsp;▶</b>.</div>`;
+  document.getElementById("explain-wrap").innerHTML = "";
+  document.getElementById("breakdown").innerHTML = "";
+  document.getElementById("rating").innerHTML = "";
+  document.getElementById("msg").textContent = "";
+  lastRec = null;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+// ---- Wire up ----
+document.getElementById("tempo").addEventListener("input", e =>
+  document.getElementById("tempoVal").textContent = e.target.value);
+document.getElementById("diversity").addEventListener("input", e =>
+  document.getElementById("divVal").textContent = e.target.value);
+document.getElementById("recommend").addEventListener("click", recommendNext);
+// A blocked video shouldn't dead-end the session: skipping asks for the next
+// recommendation, and the blocked track is already in history so it won't repeat.
+document.getElementById("pf-skip").addEventListener("click", () => {
+  hidePlaybackError();
+  recommendNext();
+});
+document.getElementById("reset").addEventListener("click", resetSession);
+document.getElementById("resetWeights").addEventListener("click", buildWeights);
+// Changing the participant label starts a genuinely new session: a fresh
+// session_id and an empty history. Without this, editing the label in place
+// leaves the previous participant's session_id on the new person's ratings,
+// so the two can't be told apart afterwards.
+document.getElementById("participant").addEventListener("change", () => {
+  SESSION_ID = newSessionId();
+  resetSession();
+});
+document.getElementById("studyMode").addEventListener("change", e => {
+  const on = e.target.checked;
+  document.getElementById("studyBox").style.display = on ? "block" : "none";
+  document.getElementById("studyNote").style.display = on ? "block" : "none";
+  // Study mode runs a controlled comparison, so the manual preference controls
+  // are disabled to make clear they don't apply.
+  ["genre", "mood", "tempo", "diversity", "artist", "sessionAware"].forEach(id => {
+    document.getElementById(id).disabled = on;
+  });
+});
+
+buildWeights();
+loadCatalogue();
+</script>
+</body>
+</html>

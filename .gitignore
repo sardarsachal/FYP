@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Logs
+*.log
+
+# Secrets
+.env
+
+# Enrichment pipeline HTTP cache (regenerated on demand)
+scripts/.cache/
+
+# User-study ratings (participant data — keep local)
+study_data/

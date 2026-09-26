@@ -1,0 +1,16 @@
+{
+  "history": ["t02"],
+  "preferences": {
+    "genre": "rock",
+    "mood": "energetic",
+    "target_tempo": 135,
+    "preferred_artist": "The Hours",
+    "weights": {
+      "genre": 0.40,
+      "artist": 0.20,
+      "tempo": 0.20,
+      "mood": 0.10,
+      "popularity": 0.10
+    }
+  }
+}
