@@ -43,7 +43,7 @@ it in the browser without writing any code.
 ## Project structure
 
 ```text
-nexttrack/
+FYP/
 ├── app/                        # The application
 │   ├── main.py                 # Starts the FastAPI app
 │   ├── config.py               # Scoring weights and settings
@@ -94,8 +94,8 @@ differ.
 **1. Get the code**
 
 ```bash
-git clone <repository-url>
-cd nexttrack
+git clone https://github.com/sardarsachal/FYP.git
+cd FYP
 ```
 
 **2. Create and activate a virtual environment**
